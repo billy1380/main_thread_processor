@@ -27,6 +27,12 @@ class ProcessRunnables implements Task {
     _progress++;
   }
 
+  @override
+  void reset() {
+    _progress = 0;
+    _running = false;
+  }
+
   void addRunnable(String name, Runnable runnable) {
     if (_running) {
       _log.info(
