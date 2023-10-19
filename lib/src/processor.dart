@@ -9,6 +9,7 @@ class Processor {
   static Processor? _one;
 
   Timer? _subscription;
+  int _period = 20;
 
   Processor._();
 
@@ -117,10 +118,20 @@ class Processor {
   void _resume() {
     if (!_inUpdate && hasOutstanding && _isPaused) {
       _subscription = Timer.periodic(
-          const Duration(
-            milliseconds: 20,
+          Duration(
+            milliseconds: _period,
           ),
           (Timer t) => update());
     }
+  }
+
+  int get period {
+    return _period;
+  }
+
+  set period(int value) {
+    _pause();
+    _period = value;
+    _resume();
   }
 }
