@@ -27,7 +27,7 @@ class Processor {
     if (_isPaused && !_inUpdate) {
       _log.info("resuming update loop...");
 
-      _resume();
+      resume();
     }
   }
 
@@ -36,14 +36,14 @@ class Processor {
       bool paused = false;
 
       if (!_isPaused) {
-        _pause();
+        pause();
         paused = true;
       }
 
       taskQueue!.remove(task);
 
       if (paused) {
-        _resume();
+        resume();
       }
     }
   }
@@ -53,14 +53,14 @@ class Processor {
       bool paused = false;
 
       if (!_isPaused) {
-        _pause();
+        pause();
         paused = true;
       }
 
       taskQueue!.clear();
 
       if (paused) {
-        _resume();
+        resume();
       }
     }
 
@@ -99,7 +99,7 @@ class Processor {
       }
 
       if (!more) {
-        _pause();
+        pause();
       }
 
       _inUpdate = false;
@@ -110,12 +110,12 @@ class Processor {
 
   bool get hasOutstanding => taskQueue != null && taskQueue!.isNotEmpty;
 
-  void _pause() {
+  void pause() {
     _subscription?.cancel();
     _subscription = null;
   }
 
-  void _resume() {
+  void resume() {
     if (!_inUpdate && hasOutstanding && _isPaused) {
       _subscription = Timer.periodic(
           Duration(
@@ -130,8 +130,8 @@ class Processor {
   }
 
   set period(int value) {
-    _pause();
+    pause();
     _period = value;
-    _resume();
+    resume();
   }
 }
