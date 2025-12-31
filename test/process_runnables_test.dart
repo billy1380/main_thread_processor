@@ -1,3 +1,4 @@
+import 'package:main_thread_processor/src/processor.dart';
 import 'package:main_thread_processor/src/tasks/process_runnables.dart';
 import 'package:test/test.dart';
 
@@ -93,6 +94,94 @@ void main() {
       // If not added, progress would remain 0/0 = 1 (empty list is 1)
 
       expect(task.progress, 1.0);
+    });
+
+    test('multiple ProcessRunnables in queue, each with multiple items',
+        () async {
+      final processor = Processor.shared;
+      processor.removeAllTasks();
+
+      final task1Results = <String>[];
+      final task2Results = <String>[];
+      final task3Results = <String>[];
+
+      final task1 = ProcessRunnables.list([
+        ('task1-item1', () => task1Results.add("task1-item1")),
+        ('task1-item2', () => task1Results.add("task1-item2")),
+        ('task1-item3', () => task1Results.add("task1-item3")),
+      ]);
+
+      final task2 = ProcessRunnables.list([
+        ('task2-item1', () => task2Results.add("task2-item1")),
+        ('task2-item2', () => task2Results.add("task2-item2")),
+      ]);
+
+      final task3 = ProcessRunnables.list([
+        ('task3-item1', () => task3Results.add("task3-item1")),
+        ('task3-item2', () => task3Results.add("task3-item2")),
+        ('task3-item3', () => task3Results.add("task3-item3")),
+        ('task3-item4', () => task3Results.add("task3-item4")),
+      ]);
+
+      processor.addTask(task1);
+      processor.addTask(task2);
+      processor.addTask(task3);
+
+      expect(processor.hasOutstanding, isTrue);
+      expect(task1.progress, 0.0);
+      expect(task2.progress, 0.0);
+      expect(task3.progress, 0.0);
+
+      // Process task1 - should execute all 3 items
+      await processor.update();
+      expect(task1Results, ["task1-item1"]);
+      expect(task1.progress, closeTo(0.33, 0.01));
+
+      await processor.update();
+      expect(task1Results, ["task1-item1", "task1-item2"]);
+      expect(task1.progress, closeTo(0.67, 0.01));
+
+      await processor.update();
+      expect(task1Results, ["task1-item1", "task1-item2", "task1-item3"]);
+      expect(task1.progress, 1.0);
+
+      // Task1 should be removed, now process task2
+      await processor.update();
+      expect(task2Results, ["task2-item1"]);
+      expect(task2.progress, 0.5);
+
+      await processor.update();
+      expect(task2Results, ["task2-item1", "task2-item2"]);
+      expect(task2.progress, 1.0);
+
+      // Task2 should be removed, now process task3
+      await processor.update();
+      expect(task3Results, ["task3-item1"]);
+      expect(task3.progress, 0.25);
+
+      await processor.update();
+      expect(task3Results, ["task3-item1", "task3-item2"]);
+      expect(task3.progress, 0.5);
+
+      await processor.update();
+      expect(task3Results, ["task3-item1", "task3-item2", "task3-item3"]);
+      expect(task3.progress, 0.75);
+
+      await processor.update();
+      expect(task3Results,
+          ["task3-item1", "task3-item2", "task3-item3", "task3-item4"]);
+      expect(task3.progress, 1.0);
+
+      // All tasks should be complete
+      expect(processor.hasOutstanding, isFalse);
+
+      // Verify all items executed in the correct order
+      expect(task1Results, ["task1-item1", "task1-item2", "task1-item3"]);
+      expect(task2Results, ["task2-item1", "task2-item2"]);
+      expect(task3Results,
+          ["task3-item1", "task3-item2", "task3-item3", "task3-item4"]);
+
+      processor.removeAllTasks();
     });
   });
 }

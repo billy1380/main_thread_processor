@@ -84,7 +84,8 @@ class Processor {
         task.run();
 
         double progress = task.progress;
-        _log.info("current run is $progress of total task size (0.0 - 1.0)");
+        final progressPercentage = progress * 100;
+        _log.info("current run is ${progressPercentage.toStringAsFixed(1)}%");
         if (progress >= 1) {
           _log.info("task complete removing...");
           taskQueue!.remove(task);
