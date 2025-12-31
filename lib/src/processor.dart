@@ -8,7 +8,7 @@ class Processor {
 
   static Processor? _one;
 
-  Timer? _subscription;
+  StreamSubscription? _subscription;
   int _period = 20;
 
   Processor._();
@@ -117,11 +117,8 @@ class Processor {
 
   void resume() {
     if (!_inUpdate && hasOutstanding && _isPaused) {
-      _subscription = Timer.periodic(
-          Duration(
-            milliseconds: _period,
-          ),
-          (Timer t) => update());
+      _subscription = Stream.periodic(const Duration(seconds: 1))
+          .listen((event) => update());
     }
   }
 
