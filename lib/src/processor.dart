@@ -9,7 +9,7 @@ import 'package:main_thread_processor/src/task_context.dart';
 /// Use [Processor.shared] for global tasks, or create a new [Processor]
 /// instance to manage a dedicated queue of tasks (e.g., for a specific screen or feature).
 ///
-/// All [Processor] instances delegate to a single background "marshal" to ensure
+/// All [Processor] instances delegate to a single background [Scheduler] to ensure
 /// tasks are executed sequentially on the main thread, preventing jank.
 class Processor {
   final TaskContext _context;
@@ -26,63 +26,63 @@ class Processor {
 
   /// Adds a [task] to this processor's queue.
   void addTask(Task task) {
-    _CentralProcessor.shared.addTask(task, context: _context);
+    Scheduler.shared.addTask(task, context: _context);
   }
 
   /// Removes a specific [task] from this processor's queue.
   void removeTask(Task? task) {
-    _CentralProcessor.shared.removeTask(task);
+    Scheduler.shared.removeTask(task);
   }
 
   /// Removes all tasks associated with this processor instance.
   void removeAllTasks() {
-    _CentralProcessor.shared.removeTasksForContext(_context);
+    Scheduler.shared.removeTasksForContext(_context);
   }
 
   /// Pauses the global processing loop.
   /// Note: This affects ALL processor instances.
+  /// Use [Scheduler.pause] for clarity that this is a global action.
   void pause() {
-    _CentralProcessor.shared.pause();
+    Scheduler.shared.pause();
   }
 
   /// Resumes the global processing loop.
+  /// Use [Scheduler.resume] for clarity that this is a global action.
   void resume() {
-    _CentralProcessor.shared.resume();
+    Scheduler.shared.resume();
   }
 
   /// Checks if this specific processor has any tasks waiting.
   bool get hasOutstanding =>
-      _CentralProcessor.shared.hasTasksForContext(_context);
+      Scheduler.shared.hasTasksForContext(_context);
 
   /// Manually triggers an update cycle (mostly for testing).
   Future<bool> update() {
-    return _CentralProcessor.shared.update();
+    return Scheduler.shared.update();
   }
-
-  /// Gets or sets the global processing period in milliseconds.
-  int get period => _CentralProcessor.shared.period;
-
-  set period(int value) => _CentralProcessor.shared.period = value;
 
   /// Access to the underlying task queue (for testing).
   /// Returns only tasks belonging to this processor's context.
   List<Task>? get taskQueue {
-    return _CentralProcessor.shared._taskQueues[_context];
+    return Scheduler.shared._taskQueues[_context];
   }
 }
 
 /// The internal singleton engine that marshals all tasks.
-class _CentralProcessor {
-  static final Logger _log = Logger("Processor");
+///
+/// Controls the global execution loop and timing.
+class Scheduler {
+  static final Logger _log = Logger("Scheduler");
 
-  static _CentralProcessor? _one;
+  static Scheduler? _one;
 
   StreamSubscription? _subscription;
   int _period = 20; // in milliseconds
 
-  _CentralProcessor._();
+  Scheduler._();
 
-  static _CentralProcessor get shared => _one ??= _CentralProcessor._();
+  /// The global shared scheduler instance.
+  static Scheduler get shared => _one ??= Scheduler._();
 
   bool get _isPaused => _subscription == null;
   bool _inUpdate = false;
@@ -96,6 +96,8 @@ class _CentralProcessor {
   // Index tracking the current position in the Round-Robin cycle.
   int _currentContextIndex = 0;
 
+  /// Adds a task to the scheduler for a specific context.
+  /// Typically called by [Processor.addTask].
   void addTask(Task task, {required TaskContext context}) {
     if (!_taskQueues.containsKey(context)) {
       _taskQueues[context] = [];
@@ -110,6 +112,8 @@ class _CentralProcessor {
     }
   }
 
+  /// Removes a task from the scheduler.
+  /// Typically called by [Processor.removeTask].
   void removeTask(Task? task) {
     if (task == null) return;
 
@@ -132,6 +136,8 @@ class _CentralProcessor {
     }
   }
 
+  /// Removes all tasks for a specific context.
+  /// Typically called by [Processor.removeAllTasks].
   void removeTasksForContext(TaskContext context) {
     bool paused = false;
     if (!_isPaused) {
@@ -152,6 +158,7 @@ class _CentralProcessor {
     return _taskQueues[context]?.isNotEmpty ?? false;
   }
 
+  /// Manually runs one cycle of the scheduler.
   Future<bool> update() async {
     bool more = false;
 
@@ -235,13 +242,16 @@ class _CentralProcessor {
     }
   }
 
+  /// Checks if there are any tasks in any queue.
   bool get hasOutstanding => _taskQueues.isNotEmpty;
 
+  /// Pauses the global scheduling loop.
   void pause() {
     _subscription?.cancel();
     _subscription = null;
   }
 
+  /// Resumes the global scheduling loop.
   void resume() {
     if (!_inUpdate && hasOutstanding && _isPaused) {
       _subscription = Stream.periodic(Duration(milliseconds: _period))
@@ -249,10 +259,15 @@ class _CentralProcessor {
     }
   }
 
+  /// Gets the global processing period in milliseconds.
   int get period {
     return _period;
   }
 
+  /// Sets the global processing period in milliseconds.
+  ///
+  /// This setting controls the interval of the central timer loop.
+  /// Adjusting this value restarts the timer.
   set period(int value) {
     pause();
     _period = value;

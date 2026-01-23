@@ -25,13 +25,16 @@ dependencies:
 
 ## Usage
 
-### 1. The Processor
+### 1. The Processor and Scheduler
 
-The `Processor` is a singleton that drives the execution of tasks. It checks the task queue every 20ms (default) and runs the current task.
+The `Processor` manages queues of tasks, while the `Scheduler` controls the global execution loop.
 
 ```dart
-// (Optional) Configure the update period
-Processor.shared.period = 30; // Check/Run tasks every 30ms
+// (Optional) Configure the update period via the Scheduler
+Scheduler.shared.period = 30; // Check/Run tasks every 30ms
+
+// Add tasks to a processor
+Processor.shared.addTask(myTask);
 ```
 
 ### 2. Synchronous Tasks (`ProcessRunnables`)
@@ -114,12 +117,17 @@ void main() {
 
 ## API Overview
 
+### `Scheduler`
+-   `Scheduler.shared`: Access the global singleton.
+-   `period`: (int) Get or set the interval in milliseconds between processing ticks.
+-   `pause()`: Pauses the global loop.
+-   `resume()`: Resumes the global loop.
+
 ### `Processor`
--   `Processor.shared`: Access the singleton instance.
+-   `Processor.shared`: Access the default shared instance.
 -   `addTask(Task task)`: specific task to the queue for execution.
 -   `removeTask(Task task)`: Cancels and removes a specific task.
--   `removeAllTasks()`: Clears the entire queue.
--   `period`: (int) Get or set the interval in milliseconds between processing ticks.
+-   `removeAllTasks()`: Clears the entire queue for this processor.
 
 ### `Task` (Abstract)
 -   `progress`: (double) Current completion status (0.0 to 1.0).
