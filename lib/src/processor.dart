@@ -53,8 +53,7 @@ class Processor {
   }
 
   /// Checks if this specific processor has any tasks waiting.
-  bool get hasOutstanding =>
-      Scheduler.shared.hasTasksForContext(_context);
+  bool get hasOutstanding => Scheduler.shared.hasTasksForContext(_context);
 
   /// Manually triggers an update cycle (mostly for testing).
   Future<bool> update() {
@@ -68,6 +67,8 @@ class Processor {
   }
 }
 
+const _defaultSchedulerPeriod = 20; // in milliseconds
+
 /// The internal singleton engine that marshals all tasks.
 ///
 /// Controls the global execution loop and timing.
@@ -77,7 +78,7 @@ class Scheduler {
   static Scheduler? _one;
 
   StreamSubscription? _subscription;
-  int _period = 20; // in milliseconds
+  int _period = _defaultSchedulerPeriod;
 
   Scheduler._();
 
@@ -272,5 +273,9 @@ class Scheduler {
     pause();
     _period = value;
     resume();
+  }
+
+  void resetPeriod() {
+    period = _defaultSchedulerPeriod;
   }
 }
