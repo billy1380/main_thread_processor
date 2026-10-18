@@ -12,7 +12,16 @@ This approach is ideal for preventing frame drops (jank) in Flutter applications
     -   `ProcessRunnables`: For synchronous work (CPU bound).
     -   `ProcessAsyncRunnables`: For asynchronous work (IO bound), with support for sequential or parallel execution.
 -   **Progress Tracking**: Built-in 0.0 to 1.0 progress reporting for all tasks.
+-   **Stall Detection**: A task that stops making progress is logged as a warning, and removed with a severe log at the stall limit. It cannot be switched off.
 -   **Automatic Resource Management**: The processor automatically pauses its timer when the queue is empty.
+
+## Stalled tasks
+
+The scheduler logs a warning when a task makes no progress for `Scheduler.shared.stallWarning` (10 seconds by default) and removes it with a severe log at `stallLimit` (120 seconds by default). The limits can be moved, not removed:
+
+```dart
+Scheduler.shared.stallLimit = const Duration(seconds: 30);
+```
 
 ## Getting Started
 
@@ -122,12 +131,20 @@ void main() {
 -   `period`: (int) Get or set the interval in milliseconds between processing ticks.
 -   `pause()`: Pauses the global loop.
 -   `resume()`: Resumes the global loop.
+-   `stallWarning`: (Duration) How long a task can make no progress before a warning is logged.
+-   `stallLimit`: (Duration) How long a task can make no progress before it is removed with a severe log.
+-   `resetStallLimits()`: Restores the default stall durations.
 
 ### `Processor`
 -   `Processor.shared`: Access the default shared instance.
 -   `addTask(Task task)`: specific task to the queue for execution.
 -   `removeTask(Task task)`: Cancels and removes a specific task.
 -   `removeAllTasks()`: Clears the entire queue for this processor.
+
+### `ProcessAsyncRunnables`
+-   `addAsyncRunnable(String name, AsyncRunnable runnable)`: Adds an asynchronous step; discarded with a warning once the task has started.
+-   `runInParallel`: (bool) Start every step at once (default), or run them one after another when `false`.
+-   A step that throws is logged as severe and counted as finished.
 
 ### `Task` (Abstract)
 -   `progress`: (double) Current completion status (0.0 to 1.0).

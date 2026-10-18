@@ -1,4 +1,5 @@
 import 'package:main_thread_processor/src/processor.dart';
+import 'package:main_thread_processor/src/scheduler.dart';
 import 'package:main_thread_processor/src/tasks/process_runnables.dart';
 import 'package:test/test.dart';
 
