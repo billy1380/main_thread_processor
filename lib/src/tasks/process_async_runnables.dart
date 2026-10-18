@@ -40,9 +40,7 @@ class ProcessAsyncRunnables extends Task {
           in _asyncRunnables) {
         _log.info("Running task named [$name]");
 
-        asyncRunnable().catchError((Object error, StackTrace stackTrace) {
-          _log.severe("[$name] failed", error, stackTrace);
-        }).whenComplete(() {
+        asyncRunnable().whenComplete(() {
           _completed++;
         });
       }
@@ -60,9 +58,7 @@ class ProcessAsyncRunnables extends Task {
     final (name, asyncRunnable) = _asyncRunnables[index];
     _log.info("Running task named [$name]");
 
-    asyncRunnable().catchError((Object error, StackTrace stackTrace) {
-      _log.severe("[$name] failed", error, stackTrace);
-    }).whenComplete(() {
+    asyncRunnable().whenComplete(() {
       _completed++;
       _runSequential(index + 1);
     });

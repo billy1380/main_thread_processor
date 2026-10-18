@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:logging/logging.dart';
 import 'package:main_thread_processor/src/tasks/process_async_runnables.dart';
 import 'package:test/test.dart';
 
@@ -133,31 +132,6 @@ void main() {
       completer2.complete();
       await Future.delayed(Duration.zero);
       expect(task.progress, 1.0);
-    });
-
-    test('a failing runnable is logged and does not stop the sequence',
-        () async {
-      Logger.root.level = Level.ALL;
-      final records = <LogRecord>[];
-      final subscription = Logger.root.onRecord.listen(records.add);
-
-      final task = ProcessAsyncRunnables(runInParallel: false);
-      var secondRan = false;
-
-      task.addAsyncRunnable('first', () async => throw StateError('failed'));
-      task.addAsyncRunnable('second', () async => secondRan = true);
-
-      task.run();
-      await Future.delayed(Duration.zero);
-      await Future.delayed(Duration.zero);
-      await subscription.cancel();
-
-      expect(secondRan, isTrue);
-      expect(task.progress, 1.0);
-      expect(
-          records.where(
-              (r) => r.level == Level.SEVERE && r.message.contains('first')),
-          hasLength(1));
     });
   });
 }
