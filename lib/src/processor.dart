@@ -88,8 +88,13 @@ class Scheduler {
   bool get _isPaused => _subscription == null;
   bool _inUpdate = false;
 
-  // Map of contexts to their respective task queues.
+  // Map of contexts to their respective run queues.
   final Map<TaskContext, List<Task>> _taskQueues = {};
+
+  // Tasks that were called without making progress. They are off the run
+  // queue, so they are not called again, until their progress changes.
+  final Map<TaskContext, List<Task>> _runningTasks = {};
+  final Map<Task, double> _progressWhenParked = {};
 
   // Ordered list of active contexts for Round-Robin scheduling.
   final List<TaskContext> _activeContexts = [];
@@ -130,6 +135,11 @@ class Scheduler {
       }
     }
 
+    for (final running in _runningTasks.values) {
+      running.remove(task);
+    }
+    _progressWhenParked.remove(task);
+
     _cleanupEmptyContexts();
 
     if (paused) {
@@ -147,6 +157,7 @@ class Scheduler {
     }
 
     _taskQueues.remove(context);
+    _runningTasks.remove(context)?.forEach(_progressWhenParked.remove);
     _activeContexts.remove(context);
     _adjustContextIndex();
 
@@ -156,7 +167,7 @@ class Scheduler {
   }
 
   bool hasTasksForContext(TaskContext context) {
-    return _taskQueues[context]?.isNotEmpty ?? false;
+    return !_isIdle(context);
   }
 
   /// Manually runs one cycle of the scheduler.
@@ -175,28 +186,15 @@ class Scheduler {
         }
 
         final currentContext = _activeContexts[_currentContextIndex];
-        final currentQueue = _taskQueues[currentContext];
 
-        if (currentQueue != null && currentQueue.isNotEmpty) {
-          Task task = currentQueue.first;
-
-          _log.info("Found task from context $currentContext");
-          _log.info("running task...");
-          task.run();
-
-          double progress = task.progress;
-          final progressPercentage = progress * 100;
-          _log.info("current run is ${progressPercentage.toStringAsFixed(1)}%");
-
-          if (progress >= 1) {
-            _log.info("task complete removing...");
-            currentQueue.remove(task);
-          }
+        if (_taskQueues.containsKey(currentContext)) {
+          _serve(currentContext);
         }
 
-        // Cleanup if the current queue became empty
-        if (currentQueue == null || currentQueue.isEmpty) {
+        // Cleanup if the current context has nothing left
+        if (_isIdle(currentContext)) {
           _taskQueues.remove(currentContext);
+          _runningTasks.remove(currentContext);
           _activeContexts.removeAt(_currentContextIndex);
           _adjustContextIndex();
         } else {
@@ -222,14 +220,70 @@ class Scheduler {
     return more;
   }
 
+  // A context serves one task at a time, so its order is kept: a task that is
+  // running holds the context until its progress changes.
+  void _serve(TaskContext context) {
+    final List<Task> ready = _taskQueues[context]!;
+    final List<Task> running = _runningTasks.putIfAbsent(context, () => []);
+
+    if (running.isNotEmpty) {
+      final Task parked = running.first;
+      final double progress = parked.progress;
+
+      if (progress >= 1) {
+        _log.info("running task complete removing...");
+        running.remove(parked);
+        _progressWhenParked.remove(parked);
+        return;
+      }
+
+      if (_sameProgress(progress, _progressWhenParked[parked]!)) {
+        return;
+      }
+
+      running.remove(parked);
+      _progressWhenParked.remove(parked);
+      ready.insert(0, parked);
+    }
+
+    if (ready.isEmpty) return;
+
+    final Task task = ready.first;
+
+    _log.info("Found task from context $context");
+    _log.info("running task...");
+
+    final double before = task.progress;
+    task.run();
+    final double progress = task.progress;
+
+    _log.info("current run is ${(progress * 100).toStringAsFixed(1)}%");
+
+    if (progress >= 1) {
+      _log.info("task complete removing...");
+      ready.remove(task);
+    } else if (_sameProgress(before, progress)) {
+      ready.remove(task);
+      running.add(task);
+      _progressWhenParked[task] = progress;
+    }
+  }
+
+  // NaN is never equal to itself, so a 0 / 0 progress would look like movement
+  static bool _sameProgress(double a, double b) =>
+      a == b || (a.isNaN && b.isNaN);
+
+  bool _isIdle(TaskContext context) {
+    return (_taskQueues[context]?.isEmpty ?? true) &&
+        (_runningTasks[context]?.isEmpty ?? true);
+  }
+
   void _cleanupEmptyContexts() {
-    final emptyContexts = _taskQueues.entries
-        .where((e) => e.value.isEmpty)
-        .map((e) => e.key)
-        .toList();
+    final emptyContexts = _taskQueues.keys.where(_isIdle).toList();
 
     for (final context in emptyContexts) {
       _taskQueues.remove(context);
+      _runningTasks.remove(context);
       _activeContexts.remove(context);
     }
     _adjustContextIndex();
